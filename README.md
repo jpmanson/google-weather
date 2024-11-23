@@ -1,6 +1,6 @@
-# google-weather
+# pygoogleweather
 
-`google-weather` is a Python library to get weather information from Google Search. No API keys required.
+`pygoogleweather` is a Python library to get weather information from Google Search. No API keys required.
 
 ## Features
 
