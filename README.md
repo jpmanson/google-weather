@@ -14,7 +14,7 @@
 You can install the library using pip:
 
 ```bash
-pip install google-weather
+pip install pygoogleweather
 ```
 
 ## Usage
