@@ -5,7 +5,7 @@ README = (Path(__file__).parent/"README.md").read_text()
 
 setuptools.setup(
     name="pygoogleweather",
-    version="0.1.1",
+    version="0.1.2",
     author="Juan Pablo Manson",
     author_email="jpmanson@gmail.com",
     description="Python library to get weather from Google Search. No API keys required.",
