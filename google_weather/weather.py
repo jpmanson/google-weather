@@ -1,19 +1,9 @@
 import logging
 from typing import Dict, Any
-from pathlib import Path
 from playwright.async_api import async_playwright
-import re
 from bs4 import BeautifulSoup
 from datetime import datetime
-import brotli
-import html
-from google_weather.lang import lang_queries
-import os
-import requests
-import brotli
-import html
 from pathlib import Path
-from playwright.sync_api import sync_playwright
 import re
 
 # Configurar logging
