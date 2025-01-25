@@ -146,11 +146,13 @@ class WeatherScraper:
                     temp = await temp_elem.text_content()
                     temp_value = float(temp)
                     
-                    # Convert temperature if needed
-                    if temp_unit == 'F':
-                        temp_value = (temp_value * 9/5) + 32
-                    elif temp_unit == 'K':
-                        temp_value = temp_value + 273.15
+                    # Check if we need to convert from Celsius
+                    current_unit = 'C'  # Google Weather always shows Celsius first
+                    if temp_unit != current_unit:
+                        if temp_unit == 'F':
+                            temp_value = (temp_value * 9/5) + 32
+                        elif temp_unit == 'K':
+                            temp_value = temp_value + 273.15
                     
                     data['temperature'] = f"{round(temp_value, 1)}°{temp_unit}"
                 
@@ -165,10 +167,26 @@ class WeatherScraper:
                     data['humidity'] = await humidity_elem.text_content()
                 
                 # Wind
-                wind_selector = '#wob_tws' if wind_unit == 'mph' else '#wob_ws'
-                wind_elem = await page.query_selector(wind_selector)
+                wind_elem = await page.query_selector('#wob_ws')  # Always get km/h first
                 if wind_elem:
-                    data['wind'] = await wind_elem.text_content()
+                    wind_text = await wind_elem.text_content()
+                    try:
+                        # Extract numeric value
+                        wind_value = float(re.search(r'[\d.]+', wind_text).group())
+                        
+                        # Convert if needed
+                        if wind_unit == 'mph' and 'km/h' in wind_text.lower():
+                            wind_value = wind_value * 0.621371  # Convert km/h to mph
+                        
+                        # Format with proper unit
+                        unit_text = 'mph' if wind_unit == 'mph' else 'km/h'
+                        data['wind'] = f"{round(wind_value, 1)} {unit_text}"
+                    except (AttributeError, ValueError):
+                        data['wind'] = wind_text  # Fallback to original text if parsing fails
+                
+                # Location - Improve parsing
+                location = location.split('|')[0].strip()  # Remove anything after pipe
+                location = re.sub(r'\s+hourly$', '', location, flags=re.IGNORECASE)  # Remove 'hourly' suffix
                 
                 if not all(k in data for k in ['temperature', 'condition', 'humidity', 'wind', 'location']):
                     missing = [k for k in ['temperature', 'condition', 'humidity', 'wind', 'location'] if k not in data]
