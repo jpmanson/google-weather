@@ -1,76 +1,96 @@
 import unittest
-from unittest.mock import patch, Mock
-from google_weather.weather import get_current_weather
+from google_weather.weather import WeatherScraper
+import pytest
+from typing import Dict, Any
+import time
 
-class TestGetWeather(unittest.TestCase):
-    @patch('google_weather.weather.requests.get')
-    def test_get_weather_buenos_aires_default(self, mock_get):
-        # Configurar el mock de la respuesta HTML
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = '''
-            <div id="wob_tm">25</div>
-            <div id="wob_hm">80%</div>
-            <span id="wob_ws">10 km/h</span>
-            <span id="wob_tws">6 mph</span>
-            <div id="wob_dc">Soleado</div>
-            <div class="wob_loc">Buenos Aires</div>
-            <div class="vk_bk wob-unit"><span aria-disabled="true" style="display:inline">°C</span></div>
-        '''
-        mock_get.return_value = mock_response
+class TestWeatherScraper(unittest.TestCase):
+    def setUp(self):
+        self.scraper = WeatherScraper(debug=True)
 
-        result = get_current_weather('Buenos Aires')
+    def test_get_weather_buenos_aires(self):
+        """Test getting weather for Buenos Aires in Spanish"""
+        result = self.scraper.get_weather('Buenos Aires', lang='es')
         
-        # Verificar estructura y formato en lugar de valores específicos
+        # Verify structure
         self.assertIsInstance(result, dict)
-        self.assertEqual(set(result.keys()), {'temperature', 'humidity', 'wind', 'condition', 'location'})
+        self.assertEqual(
+            set(result.keys()), 
+            {'temperature', 'humidity', 'wind', 'condition', 'location'}
+        )
         
-        # Verificar formato de temperatura
+        # Verify data types and formats
         self.assertTrue(result['temperature'].endswith('°C'))
-        self.assertTrue(float(result['temperature'].rstrip('°C')))
-        
-        # Verificar formato de humedad
         self.assertTrue(result['humidity'].endswith('%'))
-        
-        # Verificar formato de viento
-        self.assertTrue(result['wind'].endswith('kmh'))
-        
-        # Verificar que condition y location no están vacíos
-        self.assertTrue(len(result['condition']) > 0)
-        self.assertTrue(len(result['location']) > 0)
+        self.assertTrue(any(unit in result['wind'] for unit in ['km/h', 'kmh']))
+        self.assertTrue(result['condition'].strip())
+        self.assertTrue('buenos aires' in result['location'].lower())
 
-    @patch('google_weather.weather.requests.get')
-    def test_get_weather_custom_units(self, mock_get):
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = '''
-            <div id="wob_tm">25</div>
-            <div id="wob_hm">80%</div>
-            <span id="wob_ws">10 km/h</span>
-            <span id="wob_tws">6 mph</span>
-            <div id="wob_dc">Soleggiato</div>
-            <div class="wob_loc">Buenos Aires</div>
-            <div class="vk_bk wob-unit"><span aria-disabled="true" style="display:inline">°C</span></div>
-        '''
-        mock_get.return_value = mock_response
-
-        result = get_current_weather('Buenos Aires', wind_unit='mph', lang='it', temp_unit='F')
+    def test_get_weather_custom_units(self):
+        """Test getting weather with custom units"""
+        result = self.scraper.get_weather(
+            'New York', 
+            lang='en',
+            temp_unit='F',
+            wind_unit='mph'
+        )
         
-        # Verificar unidades personalizadas
+        # Verify units
         self.assertTrue(result['temperature'].endswith('°F'))
-        self.assertTrue(float(result['temperature'].rstrip('°F')))
-        self.assertTrue(result['wind'].endswith('mph'))
+        self.assertTrue('mph' in result['wind'].lower())
+        self.assertTrue('new york' in result['location'].lower())
 
-    @patch('google_weather.weather.requests.get')
-    def test_get_weather_error_response(self, mock_get):
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_get.return_value = mock_response
-
-        with self.assertRaises(Exception) as context:
-            get_current_weather('New York', lang='en')
+    def test_get_weather_multiple_languages(self):
+        """Test getting weather in different languages"""
+        # Test in English
+        result_en = self.scraper.get_weather('Paris', lang='en')
+        self.assertTrue('paris' in result_en['location'].lower())
         
-        self.assertTrue('Error getting weather: 404' in str(context.exception))
+        # Test in French
+        result_fr = self.scraper.get_weather('Paris', lang='fr')
+        self.assertTrue('paris' in result_fr['location'].lower())
+
+    def test_get_weather_invalid_city(self):
+        """Test getting weather for an invalid city"""
+        with self.assertRaises(Exception) as context:
+            self.scraper.get_weather('ThisCityDoesNotExist12345')
+        self.assertTrue('Error getting weather' in str(context.exception))
+
+def test_get_weather_playwright():
+    """Test using Playwright directly"""
+    scraper = WeatherScraper(debug=True)
+    
+    def validate_weather_data(result: Dict[str, Any], city: str):
+        # Verify structure
+        assert isinstance(result, dict)
+        assert set(result.keys()) == {'temperature', 'humidity', 'wind', 'condition', 'location'}
+        
+        # Verify temperature format and range
+        assert result['temperature'].endswith('°C')
+        temp = float(result['temperature'].rstrip('°C'))
+        assert -50 <= temp <= 50
+        
+        # Verify humidity format and range
+        assert result['humidity'].endswith('%')
+        humidity = int(result['humidity'].rstrip('%'))
+        assert 0 <= humidity <= 100
+        
+        # Verify wind format
+        assert any(unit in result['wind'] for unit in ['km/h', 'kmh', 'mph'])
+        
+        # Verify condition and location
+        assert result['condition'].strip()
+        assert city.lower() in result['location'].lower()
+        
+        return True
+    
+    # Test in Spanish
+    result_es = scraper.get_weather('Buenos Aires', lang='es')
+    assert validate_weather_data(result_es, 'Buenos Aires')
+    
+    # Test in English
+    result_en = scraper.get_weather('Buenos Aires', lang='en')
+    assert validate_weather_data(result_en, 'Buenos Aires')
 
 if __name__ == '__main__':
     unittest.main()
