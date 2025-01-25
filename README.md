@@ -26,7 +26,8 @@ playwright install chromium
 
 ## Usage
 
-Basic usage with async/await:
+### Basic Usage (Regular Python Environment)
+
 ```python
 import asyncio
 from google_weather.weather import WeatherScraper
@@ -44,7 +45,7 @@ async def main():
 asyncio.run(main())
 ```
 
-You can also specify the language, temperature unit, and wind unit:
+### Custom Options
 
 ```python
 async def main():
@@ -60,25 +61,58 @@ async def main():
     print(result)
     # {'temperature': '75.2°F', 'humidity': '72%', 'wind': '21 mph', 'condition': 'Per lo più soleggiato', 'location': 'Buenos Aires, Argentina'}
 
-    # Get weather in English
-    result = await scraper.get_weather('New York', lang='en')
-    print(result)
-    # {'temperature': '37.4°F', 'humidity': '40%', 'wind': '11 mph', 'condition': 'Mostly Cloudy', 'location': 'New York, NY'}
-
 asyncio.run(main())
+```
+
+### Using in Google Colab
+
+In Google Colab, you need to handle event loops differently. Here's how to use the library in Colab:
+
+1. First, install the required dependencies:
+```python
+!pip install pygoogleweather nest-asyncio
+!playwright install chromium
+```
+
+2. Import and configure:
+```python
+import asyncio
+import nest_asyncio
+from google_weather.weather import WeatherScraper
+
+# Enable nested event loops (required for Colab)
+nest_asyncio.apply()
+
+# Create scraper
+scraper = WeatherScraper()
+
+# Function to run async code in Colab
+def run_async(coroutine):
+    return asyncio.get_event_loop().run_until_complete(coroutine)
+```
+
+3. Get weather data:
+```python
+# Get weather for New York
+result = run_async(scraper.get_weather('New York'))
+print(result)
+
+# Get weather with custom options
+result = run_async(scraper.get_weather(
+    'Paris',
+    lang='fr',
+    temp_unit='C',
+    wind_unit='kmh'
+))
+print(result)
 ```
 
 ### Debug Mode
 
-You can enable debug mode to save screenshots and HTML content during scraping:
+You can enable debug mode to save screenshots during scraping:
 
 ```python
-async def main():
-    scraper = WeatherScraper(debug=True)
-    result = await scraper.get_weather('Tokyo')
-    # Screenshots will be saved in 'debug_screenshots' directory
-
-asyncio.run(main())
+scraper = WeatherScraper(debug=True)  # Screenshots will be saved in 'debug_screenshots' directory
 ```
 
 ### Options
@@ -98,6 +132,7 @@ The `get_weather` method accepts:
 - Python 3.9+
 - Playwright
 - Chromium browser (installed via `playwright install`)
+- nest-asyncio (for Google Colab usage)
 
 ## License
 
