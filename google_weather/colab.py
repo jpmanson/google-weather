@@ -1,5 +1,4 @@
 import asyncio
-import tracemalloc
 import nest_asyncio
 from typing import Dict, Any
 from .weather import WeatherScraper
@@ -9,8 +8,6 @@ class ColabWeatherClient:
     
     def __init__(self, debug: bool = False):
         # Configurar el entorno de Colab
-        if not tracemalloc.is_running():
-            tracemalloc.start()
         nest_asyncio.apply()
         
         # Crear el scraper
