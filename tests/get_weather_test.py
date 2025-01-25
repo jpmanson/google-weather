@@ -1,65 +1,66 @@
-import unittest
-from google_weather.weather import WeatherScraper
 import pytest
+from google_weather.weather import WeatherScraper
 from typing import Dict, Any
-import time
 
-class TestWeatherScraper(unittest.TestCase):
-    def setUp(self):
-        self.scraper = WeatherScraper(debug=True)
+# Configurar pytest-asyncio como el backend por defecto
+pytest_plugins = ('pytest_asyncio',)
 
-    def test_get_weather_buenos_aires(self):
+@pytest.fixture(scope="function")
+async def scraper():
+    """Fixture para crear una instancia de WeatherScraper para cada test"""
+    _scraper = WeatherScraper(debug=True)
+    yield _scraper
+
+@pytest.mark.asyncio
+class TestWeatherScraper:
+    async def test_get_weather_buenos_aires(self, scraper):
         """Test getting weather for Buenos Aires in Spanish"""
-        result = self.scraper.get_weather('Buenos Aires', lang='es')
+        result = await scraper.get_weather('Buenos Aires', lang='es')
         
         # Verify structure
-        self.assertIsInstance(result, dict)
-        self.assertEqual(
-            set(result.keys()), 
-            {'temperature', 'humidity', 'wind', 'condition', 'location'}
-        )
+        assert isinstance(result, dict)
+        assert set(result.keys()) == {'temperature', 'humidity', 'wind', 'condition', 'location'}
         
         # Verify data types and formats
-        self.assertTrue(result['temperature'].endswith('°C'))
-        self.assertTrue(result['humidity'].endswith('%'))
-        self.assertTrue(any(unit in result['wind'] for unit in ['km/h', 'kmh']))
-        self.assertTrue(result['condition'].strip())
-        self.assertTrue('buenos aires' in result['location'].lower())
+        assert result['temperature'].endswith('°C')
+        assert result['humidity'].endswith('%')
+        assert any(unit in result['wind'] for unit in ['km/h', 'kmh'])
+        assert result['condition'].strip()
+        assert 'buenos aires' in result['location'].lower()
 
-    def test_get_weather_custom_units(self):
+    async def test_get_weather_custom_units(self, scraper):
         """Test getting weather with custom units"""
-        result = self.scraper.get_weather(
-            'New York', 
+        result = await scraper.get_weather(
+            'New York',
             lang='en',
             temp_unit='F',
             wind_unit='mph'
         )
         
         # Verify units
-        self.assertTrue(result['temperature'].endswith('°F'))
-        self.assertTrue('mph' in result['wind'].lower())
-        self.assertTrue('new york' in result['location'].lower())
+        assert result['temperature'].endswith('°F')
+        assert 'mph' in result['wind'].lower()
+        assert 'new york' in result['location'].lower()
 
-    def test_get_weather_multiple_languages(self):
+    async def test_get_weather_multiple_languages(self, scraper):
         """Test getting weather in different languages"""
         # Test in English
-        result_en = self.scraper.get_weather('Paris', lang='en')
-        self.assertTrue('paris' in result_en['location'].lower())
+        result_en = await scraper.get_weather('Paris', lang='en')
+        assert 'paris' in result_en['location'].lower()
         
         # Test in French
-        result_fr = self.scraper.get_weather('Paris', lang='fr')
-        self.assertTrue('paris' in result_fr['location'].lower())
+        result_fr = await scraper.get_weather('Paris', lang='fr')
+        assert 'paris' in result_fr['location'].lower()
 
-    def test_get_weather_invalid_city(self):
+    async def test_get_weather_invalid_city(self, scraper):
         """Test getting weather for an invalid city"""
-        with self.assertRaises(Exception) as context:
-            self.scraper.get_weather('ThisCityDoesNotExist12345')
-        self.assertTrue('Error getting weather' in str(context.exception))
+        with pytest.raises(Exception) as exc_info:
+            await scraper.get_weather('ThisCityDoesNotExist12345')
+        assert 'Error getting weather' in str(exc_info.value)
 
-def test_get_weather_playwright():
+@pytest.mark.asyncio
+async def test_get_weather_playwright(scraper):
     """Test using Playwright directly"""
-    scraper = WeatherScraper(debug=True)
-    
     def validate_weather_data(result: Dict[str, Any], city: str):
         # Verify structure
         assert isinstance(result, dict)
@@ -85,12 +86,9 @@ def test_get_weather_playwright():
         return True
     
     # Test in Spanish
-    result_es = scraper.get_weather('Buenos Aires', lang='es')
+    result_es = await scraper.get_weather('Buenos Aires', lang='es')
     assert validate_weather_data(result_es, 'Buenos Aires')
     
     # Test in English
-    result_en = scraper.get_weather('Buenos Aires', lang='en')
+    result_en = await scraper.get_weather('Buenos Aires', lang='en')
     assert validate_weather_data(result_en, 'Buenos Aires')
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -54,172 +54,151 @@ class WeatherScraper:
         if self.debug_dir:
             self.debug_dir.mkdir(exist_ok=True)
             
-    def get_weather(self, city: str, lang: str = 'en', temp_unit: str = 'C', wind_unit: str = 'kmh') -> Dict[str, Any]:
+    async def get_weather(self, city: str, lang: str = 'en', temp_unit: str = 'C', wind_unit: str = 'kmh') -> Dict[str, Any]:
         """Gets current weather for a city using Playwright"""
-        with sync_playwright() as p:
-            # Launch browser
-            browser = p.chromium.launch(
+        async with async_playwright() as p:
+            # Launch browser with stealth mode
+            browser = await p.chromium.launch(
                 headless=self.headless,
-                args=['--disable-blink-features=AutomationControlled']
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-site-isolation-trials'
+                ]
             )
             
-            # Create context
-            context = browser.new_context(
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                viewport={'width': 1280, 'height': 720},
-                locale=lang
+            # Create context with specific options
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                locale=lang,
+                timezone_id='Europe/London',
+                permissions=['geolocation'],
+                java_script_enabled=True
             )
             
-            page = context.new_page()
+            # Add stealth scripts
+            await context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+            """)
+            
+            page = await context.new_page()
             
             try:
-                # Visit Google and search for weather
-                page.goto('https://www.google.com')
-                if self.debug:
-                    page.screenshot(path=str(self.debug_dir / "1_homepage.png"))
+                # First visit Google homepage
+                await page.goto('https://www.google.com')
                 
                 # Handle consent dialog if present
                 try:
-                    consent_button = page.get_by_role(
-                        "button", 
-                        name=re.compile("Accept|Aceptar", re.IGNORECASE)
-                    )
-                    if consent_button.is_visible(timeout=5000):
-                        consent_button.click()
-                except Exception as e:
-                    logger.debug(f"No consent dialog or error: {str(e)}")
+                    consent_button = page.get_by_role("button", name=re.compile("Accept|Aceptar", re.IGNORECASE))
+                    if await consent_button.is_visible(timeout=5000):
+                        await consent_button.click()
+                except Exception:
+                    pass  # No consent dialog or error handling it
                 
                 # Search for weather
-                search_box = page.locator('textarea[name="q"]')
-                search_box.fill(f'weather {city}')
-                search_box.press('Enter')
-                page.wait_for_load_state('networkidle')
+                search_box = await page.wait_for_selector('textarea[name="q"]')
+                await search_box.fill(f'weather {city}')
+                await search_box.press('Enter')
+                
+                # Wait for navigation and weather widget
+                await page.wait_for_load_state('networkidle')
+                await page.wait_for_selector('#wob_wc', timeout=10000)
                 
                 if self.debug:
-                    page.screenshot(path=str(self.debug_dir / "2_search.png"))
+                    await page.screenshot(path=str(self.debug_dir / "weather_widget.png"))
                 
-                # Wait for weather widget
-                page.wait_for_selector('div[data-wob-di]', timeout=5000)
-                
-                # Extract weather data using more specific selectors
-                selectors = {
-                    'temperature': '#wob_tm',
-                    'condition': '#wob_dc',
-                    'humidity': '#wob_hm',
-                    'wind': '#wob_ws',
-                    'wind_mph': '#wob_tws',
-                    'location': [
-                        'div.wob_loc',
-                        '#wob_loc',
-                        'span.BBwThe'
-                    ]
-                }
-                
-                # Mostrar HTML de los elementos del clima
-                if self.debug:
-                    logger.debug("\nHTML de los elementos del clima:")
-                    temp_html = page.locator('#wob_tm').first.evaluate('el => el.outerHTML')
-                    condition_html = page.locator('#wob_dc').first.evaluate('el => el.outerHTML')
-                    humidity_html = page.locator('#wob_hm').first.evaluate('el => el.parentElement.outerHTML')
-                    wind_html = page.locator('#wob_ws').first.evaluate('el => el.parentElement.outerHTML')
-                    
-                    logger.debug(f"Temperatura HTML: {temp_html}")
-                    logger.debug(f"Condición HTML: {condition_html}")
-                    logger.debug(f"Humedad HTML: {humidity_html}")
-                    logger.debug(f"Viento HTML: {wind_html}")
-                
+                # Extract weather data
                 data = {}
-                for field, selector in selectors.items():
-                    if isinstance(selector, list):
-                        # Try multiple selectors for this field
-                        for sel in selector:
-                            try:
-                                elem = page.locator(sel).first
-                                if elem and elem.is_visible():
-                                    text = elem.text_content().strip()
-                                    if field == 'location' and city.lower() in text.lower():
-                                        data[field] = text
-                                        break
-                            except Exception as e:
-                                logger.debug(f"Error with selector {sel}: {str(e)}")
-                    else:
-                        try:
-                            elem = page.locator(selector).first
-                            if elem and elem.is_visible():
-                                data[field] = elem.text_content().strip()
-                        except Exception as e:
-                            logger.debug(f"Error with selector {selector}: {str(e)}")
                 
-                # Use city name if location not found
-                if 'location' not in data:
-                    data['location'] = city
+                # Location - usando múltiples selectores y estrategias
+                location_selectors = [
+                    'div.wob_loc',  # Selector original
+                    '#wob_loc',     # Selector alternativo
+                    'div[class*="q8U8x"] >> text=Clima en',  # Nuevo formato español
+                    f'text=Weather in {city}',  # Formato inglés
+                    f'text=Clima en {city}',    # Formato español
+                    f'text=Météo à {city}',     # Formato francés
+                ]
                 
-                # Convert temperature if needed
-                if 'temperature' in data:
-                    temp_value = float(data['temperature'])
+                location = None
+                for selector in location_selectors:
+                    try:
+                        location_elem = await page.query_selector(selector)
+                        if location_elem:
+                            location_text = await location_elem.text_content()
+                            # Limpiar el texto de la ubicación
+                            location_text = (
+                                location_text.replace('Weather in ', '')
+                                .replace('Clima en ', '')
+                                .replace('Météo à ', '')
+                                .replace('Weather for ', '')
+                                .replace('Clima para ', '')
+                                .strip()
+                            )
+                            if city.lower() in location_text.lower():
+                                location = location_text
+                                break
+                    except Exception:
+                        continue
+                
+                # Si no encontramos la ubicación en los selectores, usar la ciudad original
+                if not location:
+                    location = city
+                
+                data['location'] = location
+                
+                # Temperature
+                temp_elem = await page.query_selector('#wob_tm')
+                if temp_elem:
+                    temp = await temp_elem.text_content()
+                    temp_value = float(temp)
+                    
+                    # Convert temperature if needed
                     if temp_unit == 'F':
                         temp_value = (temp_value * 9/5) + 32
                     elif temp_unit == 'K':
                         temp_value = temp_value + 273.15
-                    data['temperature'] = f"{temp_value}°{temp_unit}"
+                    
+                    data['temperature'] = f"{round(temp_value, 1)}°{temp_unit}"
                 
-                # Get wind speed in desired unit
-                if wind_unit == 'mph':
-                    wind_elem = page.locator('#wob_tws').first
-                else:
-                    wind_elem = page.locator('#wob_ws').first
+                # Condition
+                condition_elem = await page.query_selector('#wob_dc')
+                if condition_elem:
+                    data['condition'] = await condition_elem.text_content()
                 
-                if wind_elem and wind_elem.is_visible():
-                    wind_speed = wind_elem.text_content().strip()
-                else:
-                    # Fallback to default wind speed and convert if needed
-                    wind_elem = page.locator('#wob_ws').first
-                    if wind_elem and wind_elem.is_visible():
-                        wind_text = wind_elem.text_content().strip()
-                        if wind_unit == 'mph' and 'km/h' in wind_text:
-                            # Convert from km/h to mph
-                            speed = float(wind_text.replace('km/h', '').strip())
-                            wind_speed = f"{round(speed * 0.621371)} mph"
-                        else:
-                            wind_speed = wind_text
-                    else:
-                        wind_speed = "N/A"
+                # Humidity
+                humidity_elem = await page.query_selector('#wob_hm')
+                if humidity_elem:
+                    data['humidity'] = await humidity_elem.text_content()
                 
-                if not all(k in data for k in ['temperature', 'condition', 'humidity', 'wind']):
-                    missing = [k for k in ['temperature', 'condition', 'humidity', 'wind'] if k not in data]
+                # Wind
+                wind_selector = '#wob_tws' if wind_unit == 'mph' else '#wob_ws'
+                wind_elem = await page.query_selector(wind_selector)
+                if wind_elem:
+                    data['wind'] = await wind_elem.text_content()
+                
+                if not all(k in data for k in ['temperature', 'condition', 'humidity', 'wind', 'location']):
+                    missing = [k for k in ['temperature', 'condition', 'humidity', 'wind', 'location'] if k not in data]
                     raise Exception(f"Missing weather data: {', '.join(missing)}")
                 
-                if self.debug:
-                    page.screenshot(path=str(self.debug_dir / "3_weather.png"))
-                    logger.debug("Weather data found:")
-                    for k, v in data.items():
-                        logger.debug(f"  {k}: {v}")
-                
-                return {
-                    "temperature": data['temperature'],
-                    "condition": data['condition'],
-                    "humidity": data['humidity'],
-                    "wind": wind_speed,
-                    "location": data['location']
-                }
+                return data
                 
             except Exception as e:
                 if self.debug:
-                    page.screenshot(path=str(self.debug_dir / "error.png"))
+                    await page.screenshot(path=str(self.debug_dir / "error.png"))
                     logger.error(f"Failed to get weather data: {str(e)}")
-                    logger.error(f"Current URL: {page.url}")
-                    try:
-                        content = page.content()
-                        error_file = self.debug_dir / "error.html"
-                        error_file.write_text(content, encoding='utf-8')
-                        logger.error(f"Page content saved to: {error_file}")
-                    except Exception as save_error:
-                        logger.error(f"Failed to save error page: {str(save_error)}")
                 raise Exception(f"Error getting weather: {str(e)}")
             
             finally:
-                context.close()
-                browser.close()
+                await context.close()
+                await browser.close()
 
-# Alias para mantener compatibilidad con código existente
-get_current_weather = WeatherScraper().get_weather
+# Crear una función helper para uso síncrono
+def get_weather_sync(city: str, lang: str = 'en', temp_unit: str = 'C', wind_unit: str = 'kmh') -> Dict[str, Any]:
+    """Versión síncrona del scraper para compatibilidad"""
+    import asyncio
+    scraper = WeatherScraper()
+    return asyncio.run(scraper.get_weather(city, lang, temp_unit, wind_unit))
