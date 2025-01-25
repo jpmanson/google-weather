@@ -204,18 +204,21 @@ class WeatherScraper:
             if self.debug:
                 logger.debug(f"Temperatura encontrada (raw): {temp_raw}")
             
-            # Convertir a float y validar rango
+            # La temperatura viene en Fahrenheit por defecto
             temp = float(temp_raw)
             
-            # La temperatura viene en Celsius por defecto del widget
-            if temp_unit == 'F':
-                temp = (temp * 9/5) + 32
+            # Convertir a Celsius si es necesario
+            if temp_unit == 'C':
+                temp = (temp - 32) * 5/9
             elif temp_unit == 'K':
-                temp = temp + 273.15
+                temp = (temp - 32) * 5/9 + 273.15
             
             # Validar rangos razonables (en Celsius)
             temp_celsius = temp if temp_unit == 'C' else (temp - 32) * 5/9 if temp_unit == 'F' else temp - 273.15
             if not (-50 <= temp_celsius <= 50):
+                if self.debug:
+                    logger.debug(f"Temperatura raw: {temp_raw}°F")
+                    logger.debug(f"Temperatura convertida: {temp_celsius}°C")
                 raise ValueError(f"Temperatura fuera de rango razonable: {temp_celsius}°C")
             
             return f"{round(temp, 1)}°{temp_unit}"
