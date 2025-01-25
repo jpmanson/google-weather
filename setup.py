@@ -5,7 +5,7 @@ README = (Path(__file__).parent/"README.md").read_text()
 
 setuptools.setup(
     name="pygoogleweather",
-    version="0.1.5",
+    version="0.1.6",
     author="Juan Pablo Manson",
     author_email="jpmanson@gmail.com",
     description="Python library to get weather from Google Search. No API keys required.",
@@ -22,5 +22,6 @@ setuptools.setup(
         "beautifulsoup4>=4.10.0",
         "html5lib>=1.1",  # Parser alternativo para BS4
         "lxml>=4.9.0",    # Parser alternativo para BS4
+        "nest-asyncio>=1.5.8"  # Agregamos nest-asyncio
     ]
 )

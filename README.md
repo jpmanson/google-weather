@@ -66,45 +66,33 @@ asyncio.run(main())
 
 ### Using in Google Colab
 
-In Google Colab, you need to handle event loops differently. Here's how to use the library in Colab:
+The library provides a special client for Google Colab that handles all the async complexity for you:
 
-1. First, install the required dependencies:
 ```python
-!pip install pygoogleweather nest-asyncio
+# Install
+!pip install pygoogleweather
 !playwright install chromium
-```
 
-2. Import and configure:
-```python
-import asyncio
-import nest_asyncio
-from google_weather.weather import WeatherScraper
+# Import and use
+from google_weather.colab import ColabWeatherClient
 
-# Enable nested event loops (required for Colab)
-nest_asyncio.apply()
+# Create client
+weather = ColabWeatherClient()
 
-# Create scraper
-scraper = WeatherScraper()
-
-# Function to run async code in Colab
-def run_async(coroutine):
-    return asyncio.get_event_loop().run_until_complete(coroutine)
-```
-
-3. Get weather data:
-```python
-# Get weather for New York
-result = run_async(scraper.get_weather('New York'))
+# Get weather data
+result = weather.get_weather('New York', lang='en')
 print(result)
+# {'location': 'New York', 'temperature': '19.4°F', 'condition': 'Sunny', 'humidity': '57%', 'wind': '2 mph'}
 
-# Get weather with custom options
-result = run_async(scraper.get_weather(
+# With custom units
+result = weather.get_weather(
     'Paris',
     lang='fr',
     temp_unit='C',
     wind_unit='kmh'
-))
+)
 print(result)
+# {'location': 'Paris', 'temperature': '9.0°C', 'condition': 'Nuageux', 'humidity': '85%', 'wind': '6 km/h'}
 ```
 
 ### Debug Mode
