@@ -193,6 +193,38 @@ class WeatherScraper:
                 await page.screenshot(path=str(self.debug_dir / f"search_error_{lang}.png"))
             raise
 
+    async def _extract_temperature(self, page: Page, temp_unit: str) -> str:
+        """Extrae y convierte la temperatura según la unidad deseada"""
+        try:
+            temp_element = await page.wait_for_selector("#wob_tm", state='visible')
+            if not temp_element:
+                raise ValueError("No se encontró el elemento de temperatura")
+            
+            temp_raw = await temp_element.text_content()
+            if self.debug:
+                logger.debug(f"Temperatura encontrada (raw): {temp_raw}")
+            
+            # Convertir a float y validar rango
+            temp = float(temp_raw)
+            
+            # La temperatura viene en Celsius por defecto del widget
+            if temp_unit == 'F':
+                temp = (temp * 9/5) + 32
+            elif temp_unit == 'K':
+                temp = temp + 273.15
+            
+            # Validar rangos razonables (en Celsius)
+            temp_celsius = temp if temp_unit == 'C' else (temp - 32) * 5/9 if temp_unit == 'F' else temp - 273.15
+            if not (-50 <= temp_celsius <= 50):
+                raise ValueError(f"Temperatura fuera de rango razonable: {temp_celsius}°C")
+            
+            return f"{round(temp, 1)}°{temp_unit}"
+            
+        except Exception as e:
+            if self.debug:
+                logger.error(f"Error procesando temperatura: {str(e)}")
+            raise
+
     async def get_weather(
         self, 
         city: str, 
@@ -227,14 +259,7 @@ class WeatherScraper:
             data['location'] = await self._extract_location(page, lang)
             
             # Temperatura
-            temp_elem = await page.query_selector('#wob_tm')
-            if temp_elem:
-                temp = float(await temp_elem.text_content())
-                if temp_unit == 'F':
-                    temp = (temp * 9/5) + 32
-                elif temp_unit == 'K':
-                    temp = temp + 273.15
-                data['temperature'] = f"{round(temp, 1)}°{temp_unit}"
+            data['temperature'] = await self._extract_temperature(page, temp_unit)
             
             # Condición
             condition_elem = await page.query_selector('#wob_dc')
