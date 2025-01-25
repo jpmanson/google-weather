@@ -26,36 +26,46 @@ playwright install chromium
 
 ## Usage
 
-Basic usage:
+Basic usage with async/await:
 ```python
+import asyncio
 from google_weather.weather import WeatherScraper
 
-# Create a scraper instance
-scraper = WeatherScraper()
+async def main():
+    # Create a scraper instance
+    scraper = WeatherScraper()
 
-# Get weather for a city
-result = scraper.get_weather('Buenos Aires')
-print(result)
-# {'temperature': '24.0°C', 'humidity': '72%', 'wind': '34 kmh', 'condition': 'Mayormente soleado', 'location': 'Buenos Aires, Cdad. Autónoma de Buenos Aires'}
+    # Get weather for a city
+    result = await scraper.get_weather('Buenos Aires')
+    print(result)
+    # {'temperature': '24.0°C', 'humidity': '72%', 'wind': '34 kmh', 'condition': 'Mayormente soleado', 'location': 'Buenos Aires, Argentina'}
+
+# Run the async function
+asyncio.run(main())
 ```
 
 You can also specify the language, temperature unit, and wind unit:
 
 ```python
-# Get weather in Italian with Fahrenheit and mph
-result = scraper.get_weather(
-    'Buenos Aires', 
-    lang='it',
-    temp_unit='F',
-    wind_unit='mph'
-)
-print(result)
-# {'temperature': '75.2°F', 'humidity': '72%', 'wind': '21 mph', 'condition': 'Per lo più soleggiato', 'location': 'Buenos Aires, Città Autonoma di Buenos Aires'}
+async def main():
+    scraper = WeatherScraper()
+    
+    # Get weather in Italian with Fahrenheit and mph
+    result = await scraper.get_weather(
+        'Buenos Aires', 
+        lang='it',
+        temp_unit='F',
+        wind_unit='mph'
+    )
+    print(result)
+    # {'temperature': '75.2°F', 'humidity': '72%', 'wind': '21 mph', 'condition': 'Per lo più soleggiato', 'location': 'Buenos Aires, Argentina'}
 
-# Get weather in English
-result = scraper.get_weather('New York', lang='en')
-print(result)
-# {'temperature': '37.4°F', 'humidity': '40%', 'wind': '11 mph', 'condition': 'Mostly Cloudy', 'location': 'New York, NY'}
+    # Get weather in English
+    result = await scraper.get_weather('New York', lang='en')
+    print(result)
+    # {'temperature': '37.4°F', 'humidity': '40%', 'wind': '11 mph', 'condition': 'Mostly Cloudy', 'location': 'New York, NY'}
+
+asyncio.run(main())
 ```
 
 ### Debug Mode
@@ -63,11 +73,13 @@ print(result)
 You can enable debug mode to save screenshots and HTML content during scraping:
 
 ```python
-scraper = WeatherScraper(debug=True)
-result = scraper.get_weather('Tokyo')
-```
+async def main():
+    scraper = WeatherScraper(debug=True)
+    result = await scraper.get_weather('Tokyo')
+    # Screenshots will be saved in 'debug_screenshots' directory
 
-This will save screenshots and HTML files in a `debug_screenshots` directory.
+asyncio.run(main())
+```
 
 ### Options
 

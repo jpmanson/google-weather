@@ -140,3 +140,4 @@ cython_debug/
 .idea
 .venv
 requirements.txt
+tests/debug_screenshots
