@@ -26,41 +26,48 @@ playwright install chromium
 
 ## Usage
 
-### Basic Usage (Regular Python Environment)
+### Basic Usage
+
+```python
+from google_weather.weather import get_weather_sync
+
+# Get weather for a city (returns a dictionary with weather information)
+result = get_weather_sync('Buenos Aires')
+print(result)
+# Output:
+# {
+#     'temperature': '24.0°C',
+#     'humidity': '72%',
+#     'wind': '34 km/h',
+#     'condition': 'Mostly sunny',
+#     'location': 'Buenos Aires, Argentina'
+# }
+```
+
+### Advanced Usage (with async)
 
 ```python
 import asyncio
 from google_weather.weather import WeatherScraper
 
 async def main():
-    # Create a scraper instance
-    scraper = WeatherScraper()
-
-    # Get weather for a city
-    result = await scraper.get_weather('Buenos Aires')
-    print(result)
-    # {'temperature': '24.0°C', 'humidity': '72%', 'wind': '34 kmh', 'condition': 'Mayormente soleado', 'location': 'Buenos Aires, Argentina'}
+    # Create a scraper instance with custom options
+    scraper = WeatherScraper(headless=True, debug=False)
+    
+    try:
+        # Get weather with custom language and units
+        result = await scraper.get_weather(
+            city='Paris',
+            lang='fr',          # French language
+            temp_unit='F',      # Fahrenheit
+            wind_unit='mph'     # Miles per hour
+        )
+        print(result)
+    finally:
+        # Always close the scraper to free resources
+        await scraper.close()
 
 # Run the async function
-asyncio.run(main())
-```
-
-### Custom Options
-
-```python
-async def main():
-    scraper = WeatherScraper()
-    
-    # Get weather in Italian with Fahrenheit and mph
-    result = await scraper.get_weather(
-        'Buenos Aires', 
-        lang='it',
-        temp_unit='F',
-        wind_unit='mph'
-    )
-    print(result)
-    # {'temperature': '75.2°F', 'humidity': '72%', 'wind': '21 mph', 'condition': 'Per lo più soleggiato', 'location': 'Buenos Aires, Argentina'}
-
 asyncio.run(main())
 ```
 
@@ -73,26 +80,32 @@ The library provides a special client for Google Colab that handles all the asyn
 !pip install pygoogleweather
 !playwright install chromium
 
-# Import and use
 from google_weather.colab import ColabWeatherClient
 
-# Create client
+# Crear cliente
 weather = ColabWeatherClient()
 
-# Get weather data
-result = weather.get_weather('New York', lang='en')
+# Buenos Aires
+result = weather.get_weather('Buenos Aires', lang='es')
+print("\nBuenos Aires (ES):")
 print(result)
-# {'location': 'New York', 'temperature': '19.4°F', 'condition': 'Sunny', 'humidity': '57%', 'wind': '2 mph'}
+# Buenos Aires (ES):
+# {'location': 'Buenos Aires, Cdad. Autónoma de Buenos Aires, Argentina', 'temperature': '26.7°C', 'condition': 'Parcialmente nublado', 'humidity': '53%', 'wind': '12.0 km/h'}
 
-# With custom units
-result = weather.get_weather(
-    'Paris',
-    lang='fr',
-    temp_unit='C',
-    wind_unit='kmh'
-)
+
+# New York
+result = weather.get_weather('New York', lang='en', temp_unit='F', wind_unit='mph')
+print("\nNew York (EN, °F, mph):")
 print(result)
-# {'location': 'Paris', 'temperature': '9.0°C', 'condition': 'Nuageux', 'humidity': '85%', 'wind': '6 km/h'}
+# New York (EN, °F, mph):
+# {'location': 'New York, NY', 'temperature': '30.0°F', 'condition': 'Partly cloudy', 'humidity': '45%', 'wind': '6.0 mph'}
+
+# Paris
+result = weather.get_weather('Paris', lang='fr', temp_unit='C', wind_unit='kmh')
+print("\nParis (FR, °C, kmh):")
+print(result)
+# Paris (FR, °C, kmh):
+# {'location': 'Paris, France', 'temperature': '3.9°C', 'condition': 'Nuageux', 'humidity': '93%', 'wind': '12.0 km/h'}
 ```
 
 ### Debug Mode
