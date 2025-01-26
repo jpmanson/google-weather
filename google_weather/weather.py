@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 from .lang import lang_queries, weather_labels, locale_configs, weather_conditions, unit_preferences
+import random
 
 # Configurar logging
 logging.basicConfig(
@@ -50,6 +51,18 @@ class WeatherScraper:
         self._contexts: Dict[str, BrowserContext] = {}
         
 
+    def _get_random_user_agent(self) -> str:
+        """Retorna un User-Agent aleatorio de una lista predefinida"""
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/121.0.0.0 Safari/537.36'
+        ]
+        return random.choice(user_agents)
+
     async def _get_context(self, lang: str) -> BrowserContext:
         """Obtiene o crea un contexto de navegador para el idioma especificado"""
         if lang not in self._contexts:
@@ -61,7 +74,7 @@ class WeatherScraper:
             
             context = await self._browser.new_context(
                 viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                user_agent=self._get_random_user_agent(),
                 locale=lang_config['locale'],
                 timezone_id=lang_config['timezone'],
                 permissions=['geolocation'],
