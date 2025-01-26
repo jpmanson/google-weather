@@ -49,28 +49,6 @@ class WeatherScraper:
         self._browser: Optional[Browser] = None
         self._contexts: Dict[str, BrowserContext] = {}
         
-    def clean_location(self, location: str) -> str:
-        """Cleans location string from various suffixes and formats"""
-        if not location:
-            return ''
-        
-        # Remove common prefixes/suffixes
-        location = re.sub(r'^(?:weather|tiempo|clima|météo|wetter)\s+(?:in|en|para|à|in)\s+', '', location, flags=re.IGNORECASE)
-        location = re.sub(r'\s*-\s*(?:google search|buscar con google).*$', '', location, flags=re.IGNORECASE)
-        location = re.sub(r'\s*\|\s*[^|]+$', '', location)
-        location = re.sub(r'(?:weather|tiempo|clima)$', '', location, flags=re.IGNORECASE)
-        
-        # Remove country/region information
-        location = re.sub(r',\s*(?:Argentina|NY|France|Deutschland|[A-Z]{2}|[^,]+)$', '', location)
-        
-        # Remove forecast related terms
-        location = re.sub(r'\s*(?:Hourly|Forecast|Pronóstico|7 Day|14 Day).*$', '', location, flags=re.IGNORECASE)
-        
-        # Clean up any remaining whitespace and special characters
-        location = location.strip()
-        location = re.sub(r'\s+', ' ', location)
-        
-        return location
 
     async def _get_context(self, lang: str) -> BrowserContext:
         """Obtiene o crea un contexto de navegador para el idioma especificado"""
